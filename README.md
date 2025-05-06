@@ -8,14 +8,12 @@
 *Example output from the FPGA-accelerated generator*
 
 ## 📖 Description
-This project combines FPGA hardware acceleration with Python visualization to generate intricate **epitrochoids** and **hypotrochoids** - geometric curves created by tracing points on rolling circles. Key components:
+This project combines FPGA hardware acceleration with Python visualization to generate intricate **epitrochoids** and in future **hypotrochoids** - geometric curves created by tracing points on rolling circles. Key components:
 
 - **Hardware Acceleration**: Custom VHDL IP core for parametric calculations (4.8× faster than software)
-- **Interactive GUI**: PyQt5 interface with real-time parameter control
+- **Interactive GUI**: ipycanvas interface with real-time parameter control
 - **Jupyter Integration**: `spirograph_setup.ipynb` for FPGA configuration
 - **Educational Focus**: Explores math behind spirographs and FPGA co-design
-
-Adapted from [pynq-juliabrot](https://github.com/FredKellerman/pynq-juliabrot) for PS-PL communication.
 
 ## ⚙️ Installation
 
@@ -24,15 +22,18 @@ Adapted from [pynq-juliabrot](https://github.com/FredKellerman/pynq-juliabrot) f
 - Vivado 2021.1+ (for FPGA synthesis)
 - Python 3.8+ with packages:  
   ```bash
-  pip install pynq numpy matplotlib pyqt5 ipywidgets
-
-git clone https://gitlab.cis.strath.ac.uk/cxb22132/further-vhdl-project.git
-cd further-vhdl-project
+  sudo apt pip3 install pynq numpy matplotlib ipywidgets ipycanvas
+shh into Xilinx@{your boards ip address} default pass = xilinx
+then:
+  git clone https://gitlab.cis.strath.ac.uk/cxb22132/further-vhdl-project.git
+  cd further-vhdl-project
 
 
 ### 🚀 Usage
 Jupyter Notebook Setup
 Connect to PYNQ via Jupyter Lab (http://<board-ip>:9090)
+
+enter PYNQ-Group-Project folder
 
 Run spirograph_setup.ipynb to:
 
@@ -43,3 +44,14 @@ Initialize DMA channels
 Verify hardware/software communication
 
 Launch GUI
+
+Change values to see updating of graph
+
+### Future work:
+add hypotrochoid support by copying epitrochoids adding a section for euclids algorithm to be multiplied onto the max theta and swapping some of the additions subtractions and sin cos blocks around.
+
+Allowing for a higher number of bits per input at the very least making num points be set at compile time to give more space in the 32 bit word for R r and d to allow for more interesting patterns
+
+Increasing speed of gui to redraw
+
+adding more examples of each type in the setup and a bit more text explaining what they actually are.
