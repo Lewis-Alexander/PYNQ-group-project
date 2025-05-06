@@ -4,6 +4,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
+#vestigial code that was utilised when the mathematics was performed on software
+
 def hypotrochoid(R, r, d, num_points): #traced by a point attached to a circle of radius r rolling around the inside of a fixed circle of radius R, where the point is a distance d from the center of the interior circle
     """
     Compute the x, y coordinates of a hypotrochoid:

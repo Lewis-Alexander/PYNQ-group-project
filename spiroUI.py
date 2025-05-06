@@ -1,10 +1,11 @@
 import numpy as np
+from spiro import epitrochoid
 from ipycanvas import Canvas
 from ipywidgets import Dropdown, IntSlider, FloatSlider, Button, HBox, VBox, Output, Layout
 from pynq import allocate
 
 
-
+#creates base ui
 def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
     # Canvas and state
     canvas = Canvas(width=canvas_width, height=canvas_height)
@@ -62,6 +63,10 @@ def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
         print(f"Out buffer sample: {out_buf}")
         print(f"Decoded X sample: {x.tolist()}")
         print(f"Decoded Y sample: {y.tolist()}")
+        #if hardware doesnt work
+        #print(f"original inputs: R:{R} r:{r} d:{d} points:{pts}")
+        #x,y = epitrochoid(R, r, d, pts)
+        #x,y = hypotrochoid(R, r, d, pts)
         cx, cy = canvas_width / 2, canvas_height / 2
         start_x = float(x[0] * scale + cx + offset_x)
         start_y = float(y[0] * scale + cy + offset_y)
