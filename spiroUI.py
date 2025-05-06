@@ -42,9 +42,11 @@ def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
         dma.recvchannel.transfer(out_buffer)
         dma.sendchannel.wait()
         dma.recvchannel.wait()
-        x = ((out_buffer >> 16) & 0xFFFF).astype(np.int32)
-        y = (out_buffer & 0xFFFF).astype(np.int32)
-        return x, y
+        raw_x = ((out_buffer >> 16) & 0xFFFF).astype(np.int16)
+        raw_y = (out_buffer & 0xFFFF).astype(np.int16)
+        x = raw_x.astype(np.float32) / (1 << 7)
+        y = raw_y.astype(np.float32) / (1 << 7)
+        return word, in_buffer, out_buffer, x, y
 
     def redraw(change=None):
         nonlocal offset_x, offset_y, scale
@@ -54,14 +56,21 @@ def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
         d = d_slider.value
         pts = points_slider.value
         tp = type_dropdown.value
-        x, y = fetch_trochoid(R, r, d, pts, tp)
+        word, in_buf, out_buf, x, y = fetch_trochoid(R, r, d, pts, tp)
+        print(f"Control word: 0x{word:08X}")
+        print(f"In buffer sample: {in_buf}")
+        print(f"Out buffer sample: {out_buf}")
+        print(f"Decoded X sample: {x.tolist()}")
+        print(f"Decoded Y sample: {y.tolist()}")
         cx, cy = canvas_width / 2, canvas_height / 2
-        xs = (x * scale) + cx + offset_x
-        ys = (y * scale) + cy + offset_y
+        start_x = float(x[0] * scale + cx + offset_x)
+        start_y = float(y[0] * scale + cy + offset_y)
         canvas.stroke_style = 'black'
         canvas.begin_path()
-        canvas.move_to(xs[0], ys[0])
-        for xi, yi in zip(xs[1:], ys[1:]):
+        canvas.move_to(start_x, start_y)
+        for raw_xi, raw_yi in zip(x[1:], y[1:]):
+            xi = float(raw_xi * scale + cx + offset_x)
+            yi = float(raw_yi * scale + cy + offset_y)
             canvas.line_to(xi, yi)
         canvas.stroke()
 
