@@ -12,6 +12,10 @@ from matplotlib.backends.backend_qt5agg import (
 )
 from matplotlib.figure import Figure
 from spiro import hypotrochoid, epitrochoid
+from pynq import Overlay
+
+ol = Overlay("design_1_wrapper.xsa")
+dma = ol.axi_dma
 
 class TrochoidPlot(QWidget):
     def __init__(self):
@@ -117,12 +121,30 @@ class TrochoidPlot(QWidget):
         d = self.d_spin.value()
         num_points = self.num_points_spin.value()
         trochoid_type = self.type_combo.currentText()
-
+        word = 0  #base epitrochoidal
         if trochoid_type == "Hypotrochoid":
-            x, y = hypotrochoid(R, r, d, num_points)
-        else:
-            x, y = epitrochoid(R, r, d, num_points)
-
+            word = 1 #change to hypotrochoidal
+        word = word << 7
+        word += R
+        word = word << 7
+        word += r
+        word = word << 7
+        word += d
+        word = word << 10
+        word += num_points
+        input_buffer = allocate(shape=(256,), dtype=np.uint32)
+        for i in range(256):
+            input_buffer[i] = word
+        output_buffer = allocate(shape=(256,), dtype=np.uint32)
+        dma.sendchannel.transfer(input_buffer)
+        dma.recvchannel.transfer(output_buffer)
+        dma.sendchannel.wait()
+        dma.recvchannel.wait()
+        x = []
+        y = []
+        for i in range(256):
+            x.append((output_buffer[i] >> 16) & 0xFFFF) #only select upper 16 bits
+            y.append(output_buffer[i] & 0xFFFF) #only select lower 16 bits
         # Clear and redraw
         self.figure.clear()
         self.ax = self.figure.add_subplot(111)
@@ -162,8 +184,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(TrochoidPlot())
         self.resize(1024, 768)
 
-if __name__ == "__main__":
+def showUI():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+
+showUI()
