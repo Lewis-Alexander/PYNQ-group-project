@@ -1,194 +1,113 @@
-import sys
-import math
 import numpy as np
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget,
-    QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
-    QComboBox, QPushButton, QSpinBox
-)
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas,
-    NavigationToolbar2QT as NavigationToolbar
-)
-from matplotlib.figure import Figure
-from spiro import hypotrochoid, epitrochoid
-from pynq import Overlay
+from ipycanvas import Canvas
+from ipywidgets import Dropdown, IntSlider, FloatSlider, Button, HBox, VBox, Output
+from pynq import allocate
 
-ol = Overlay("design_1_wrapper.xsa")
-dma = ol.axi_dma
 
-class TrochoidPlot(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
 
-    def initUI(self):
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(["Hypotrochoid", "Epitrochoid"])
-        self.type_combo.currentIndexChanged.connect(self.update_plot)
+def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
+    # Canvas and state
+    canvas = Canvas(width=canvas_width, height=canvas_height)
+    offset_x = 0.0
+    offset_y = 0.0
+    scale = 1.0
+    output = Output()
 
-        # R, r, d 7-bit signed integer (-31 - 31)
-        self.R_spin = QSpinBox()
-        self.R_spin.setRange(-31, 31)
-        self.R_spin.setValue(5)
-        self.R_spin.valueChanged.connect(self.update_plot)
+    # Controls
+    type_dropdown = Dropdown(options=['Hypotrochoid', 'Epitrochoid'], value='Hypotrochoid', description='Type:')
+    R_slider = IntSlider(value=5, min=-31, max=31, step=1, description='R:')
+    r_slider = IntSlider(value=3, min=-31, max=31, step=1, description='r:')
+    d_slider = IntSlider(value=5, min=-31, max=31, step=1, description='d:')
+    points_slider = IntSlider(value=500, min=1, max=1023, step=1, description='Points:')
+    pan_interval_slider = FloatSlider(value=1.0, min=0.01, max=100.0, step=0.01, description='Pan interval:')
+    zoom_slider = FloatSlider(value=1.2, min=1.01, max=10.0, step=0.01, description='Zoom factor:')
 
-        self.r_spin = QSpinBox()
-        self.r_spin.setRange(-31, 31)
-        self.r_spin.setValue(3)
-        self.r_spin.valueChanged.connect(self.update_plot)
+    btn_pan_left = Button(description='Pan Left')
+    btn_pan_right = Button(description='Pan Right')
+    btn_pan_up = Button(description='Pan Up')
+    btn_pan_down = Button(description='Pan Down')
+    btn_zoom_in = Button(description='Zoom In')
+    btn_zoom_out = Button(description='Zoom Out')
 
-        self.d_spin = QSpinBox()
-        self.d_spin.setRange(-31, 31)
-        self.d_spin.setValue(5)
-        self.d_spin.valueChanged.connect(self.update_plot)
-
-        # Numpoints 10-bit unsigned integer (1 - 1023)
-        self.num_points_spin = QSpinBox()
-        self.num_points_spin.setRange(1, 1023)
-        self.num_points_spin.setValue(500)
-        self.num_points_spin.valueChanged.connect(self.update_plot)
-
-        # Pan & Zoom controls
-        self.pan_interval_spin = QDoubleSpinBox()
-        self.pan_interval_spin.setRange(0.01, 100)
-        self.pan_interval_spin.setDecimals(2)
-        self.pan_interval_spin.setValue(1.0)
-
-        self.zoom_factor_spin = QDoubleSpinBox()
-        self.zoom_factor_spin.setRange(1.01, 10)
-        self.zoom_factor_spin.setDecimals(2)
-        self.zoom_factor_spin.setValue(1.2)
-
-        self.btn_pan_left = QPushButton("Pan Left")
-        self.btn_pan_right = QPushButton("Pan Right")
-        self.btn_pan_up = QPushButton("Pan Up")
-        self.btn_pan_down = QPushButton("Pan Down")
-        self.btn_zoom_in = QPushButton("Zoom In")
-        self.btn_zoom_out = QPushButton("Zoom Out")
-
-        # Connect pan/zoom
-        self.btn_pan_left.clicked.connect(lambda: self.pan(-1, 0))
-        self.btn_pan_right.clicked.connect(lambda: self.pan(1, 0))
-        self.btn_pan_up.clicked.connect(lambda: self.pan(0, 1))
-        self.btn_pan_down.clicked.connect(lambda: self.pan(0, -1))
-        self.btn_zoom_in.clicked.connect(lambda: self.zoom(1))
-        self.btn_zoom_out.clicked.connect(lambda: self.zoom(-1))
-
-        # Layout controls
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel("Type:"))
-        controls.addWidget(self.type_combo)
-        controls.addWidget(QLabel("R:"))
-        controls.addWidget(self.R_spin)
-        controls.addWidget(QLabel("r:"))
-        controls.addWidget(self.r_spin)
-        controls.addWidget(QLabel("d:"))
-        controls.addWidget(self.d_spin)
-        controls.addWidget(QLabel("Points:"))
-        controls.addWidget(self.num_points_spin)
-
-        panzoom = QHBoxLayout()
-        panzoom.addWidget(QLabel("Pan interval:"))
-        panzoom.addWidget(self.pan_interval_spin)
-        panzoom.addWidget(self.btn_pan_left)
-        panzoom.addWidget(self.btn_pan_right)
-        panzoom.addWidget(self.btn_pan_up)
-        panzoom.addWidget(self.btn_pan_down)
-        panzoom.addSpacing(20)
-        panzoom.addWidget(QLabel("Zoom factor:"))
-        panzoom.addWidget(self.zoom_factor_spin)
-        panzoom.addWidget(self.btn_zoom_in)
-        panzoom.addWidget(self.btn_zoom_out)
-
-        layout = QVBoxLayout()
-        layout.addLayout(controls)
-        layout.addLayout(panzoom)
-        layout.addWidget(self.toolbar)
-        layout.addWidget(self.canvas)
-        self.setLayout(layout)
-
-        # Initial plot
-        self.update_plot()
-
-    def update_plot(self):
-        R = self.R_spin.value()
-        r = self.r_spin.value()
-        d = self.d_spin.value()
-        num_points = self.num_points_spin.value()
-        trochoid_type = self.type_combo.currentText()
-        word = 0  #base epitrochoidal
-        if trochoid_type == "Hypotrochoid":
-            word = 1 #change to hypotrochoidal
-        word = word << 7
-        word += R
-        word = word << 7
-        word += r
-        word = word << 7
-        word += d
-        word = word << 10
-        word += num_points
-        input_buffer = allocate(shape=(256,), dtype=np.uint32)
-        for i in range(256):
-            input_buffer[i] = word
-        output_buffer = allocate(shape=(256,), dtype=np.uint32)
-        dma.sendchannel.transfer(input_buffer)
-        dma.recvchannel.transfer(output_buffer)
+    def fetch_trochoid(R, r, d, num_points, trochoid_type):
+        word = 0 if trochoid_type == 'Epitrochoid' else 1
+        word = (word << 7) | (R & 0x7F)
+        word = (word << 7) | (r & 0x7F)
+        word = (word << 7) | (d & 0x7F)
+        word = (word << 10) | num_points
+        in_buffer = allocate(shape=(256,), dtype=np.uint32)
+        out_buffer = allocate(shape=(256,), dtype=np.uint32)
+        in_buffer[:] = word
+        dma.sendchannel.transfer(in_buffer)
+        dma.recvchannel.transfer(out_buffer)
         dma.sendchannel.wait()
         dma.recvchannel.wait()
-        x = []
-        y = []
-        for i in range(256):
-            x.append((output_buffer[i] >> 16) & 0xFFFF) #only select upper 16 bits
-            y.append(output_buffer[i] & 0xFFFF) #only select lower 16 bits
-        # Clear and redraw
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111)
-        self.ax.plot(x, y)
-        self.ax.set_aspect('equal', 'box')
-        self.ax.set_title(f"{trochoid_type} (R={R}, r={r}, d={d}, pts={num_points})")
-        self.ax.grid(True)
-        self.canvas.draw()
+        x = ((out_buffer >> 16) & 0xFFFF).astype(np.int32)
+        y = (out_buffer & 0xFFFF).astype(np.int32)
+        return x, y
 
-    def pan(self, dx, dy):
-        interval = self.pan_interval_spin.value()
-        xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
-        self.ax.set_xlim(xlim[0] + dx * interval, xlim[1] + dx * interval)
-        self.ax.set_ylim(ylim[0] + dy * interval, ylim[1] + dy * interval)
-        self.canvas.draw()
+    def redraw(change=None):
+        nonlocal offset_x, offset_y, scale
+        canvas.clear()
+        R = R_slider.value
+        r = r_slider.value
+        d = d_slider.value
+        pts = points_slider.value
+        tp = type_dropdown.value
+        x, y = fetch_trochoid(R, r, d, pts, tp)
+        cx, cy = canvas_width / 2, canvas_height / 2
+        xs = (x * scale) + cx + offset_x
+        ys = (y * scale) + cy + offset_y
 
-    def zoom(self, direction):
-        factor = self.zoom_factor_spin.value()
-        xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
-        x_center = sum(xlim) / 2
-        y_center = sum(ylim) / 2
-        x_span = xlim[1] - xlim[0]
-        y_span = ylim[1] - ylim[0]
-        scale = 1/factor if direction > 0 else factor
-        new_x_span = x_span * scale
-        new_y_span = y_span * scale
-        self.ax.set_xlim(x_center - new_x_span/2, x_center + new_x_span/2)
-        self.ax.set_ylim(y_center - new_y_span/2, y_center + new_y_span/2)
-        self.canvas.draw()
+        # Draw polyline
+        canvas.stroke_style = 'black'
+        canvas.begin_path()
+        canvas.move_to(xs[0], ys[0])
+        for xi, yi in zip(xs[1:], ys[1:]):
+            canvas.line_to(xi, yi)
+        canvas.stroke()
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Trochoid Explorer")
-        self.setCentralWidget(TrochoidPlot())
-        self.resize(1024, 768)
+        with output:
+            output.clear_output()
+            print(f"{tp} (R={R}, r={r}, d={d}, pts={pts})")
 
-def showUI():
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+    # Pan/zoom
+    def pan_left(b):
+        nonlocal offset_x
+        offset_x -= pan_interval_slider.value
+        redraw()
+    def pan_right(b):
+        nonlocal offset_x
+        offset_x += pan_interval_slider.value
+        redraw()
+    def pan_up(b):
+        nonlocal offset_y
+        offset_y -= pan_interval_slider.value
+        redraw()
+    def pan_down(b):
+        nonlocal offset_y
+        offset_y += pan_interval_slider.value
+        redraw()
+    def zoom_in(b):
+        nonlocal scale
+        scale *= zoom_slider.value
+        redraw()
+    def zoom_out(b):
+        nonlocal scale
+        scale /= zoom_slider.value
+        redraw()
 
-
-showUI()
+    for w in [type_dropdown, R_slider, r_slider, d_slider, points_slider]:
+        w.observe(redraw, names='value')
+    btn_pan_left.on_click(pan_left)
+    btn_pan_right.on_click(pan_right)
+    btn_pan_up.on_click(pan_up)
+    btn_pan_down.on_click(pan_down)
+    btn_zoom_in.on_click(zoom_in)
+    btn_zoom_out.on_click(zoom_out)
+    top_controls = HBox([type_dropdown, R_slider, r_slider, d_slider, points_slider])
+    pan_controls = HBox([btn_pan_left, btn_pan_right, btn_pan_up, btn_pan_down, pan_interval_slider])
+    zoom_controls = HBox([btn_zoom_in, btn_zoom_out, zoom_slider])
+    ui = VBox([top_controls, pan_controls, zoom_controls, canvas, output])
+    redraw()
+    return ui
