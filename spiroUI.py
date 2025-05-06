@@ -1,6 +1,6 @@
 import numpy as np
 from ipycanvas import Canvas
-from ipywidgets import Dropdown, IntSlider, FloatSlider, Button, HBox, VBox, Output
+from ipywidgets import Dropdown, IntSlider, FloatSlider, Button, HBox, VBox, Output, Layout
 from pynq import allocate
 
 
@@ -58,8 +58,6 @@ def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
         cx, cy = canvas_width / 2, canvas_height / 2
         xs = (x * scale) + cx + offset_x
         ys = (y * scale) + cy + offset_y
-
-        # Draw polyline
         canvas.stroke_style = 'black'
         canvas.begin_path()
         canvas.move_to(xs[0], ys[0])
@@ -108,6 +106,12 @@ def create_trochoid_ui(dma, canvas_width=800, canvas_height=600):
     top_controls = HBox([type_dropdown, R_slider, r_slider, d_slider, points_slider])
     pan_controls = HBox([btn_pan_left, btn_pan_right, btn_pan_up, btn_pan_down, pan_interval_slider])
     zoom_controls = HBox([btn_zoom_in, btn_zoom_out, zoom_slider])
+
+    row_layout = Layout(display='flex', flex_flow='row wrap', align_items='center', overflow='auto', width='100%')
+    top_controls = HBox([type_dropdown, R_slider, r_slider, d_slider, points_slider], layout=row_layout)
+    pan_controls = HBox([btn_pan_left, btn_pan_right, btn_pan_up, btn_pan_down, pan_interval_slider], layout=row_layout)
+    zoom_controls = HBox([btn_zoom_in, btn_zoom_out, zoom_slider], layout=row_layout)
+
     ui = VBox([top_controls, pan_controls, zoom_controls, canvas, output])
     redraw()
     return ui
